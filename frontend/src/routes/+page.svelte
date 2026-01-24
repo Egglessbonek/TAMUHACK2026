@@ -1,81 +1,58 @@
 <script>
-	import { onMount } from 'svelte';
+  // Import both components
+  import BackgroundScroller from '$lib/BackgroundScroller.svelte';
+  import CowButton from '$lib/CowButton.svelte';
 
-	let count = $state(0);
-	let connected = $state(false);
-	let error = $state('');
-    let ws = null;
-
-	function getWsUrl() {
-		const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-		return `${wsProtocol}://${location.host}/api/ws`;
-	}
-
-	async function refresh() {
-		try {
-			const res = await fetch('/api/counter');
-			const data = await res.json();
-			count = data.count;
-		} catch (e) {
-			error = String(e);
-		}
-	}
-
-    async function increment() {
-        if (!connected) {
-            error = 'Not connected to WebSocket';
-            return;
-        }
-        try {
-            ws.send("count_moo");
-        } catch (e) {
-            error = String(e);
-        }
-    }
-
-	onMount(() => {
-		refresh();
-
-		try {
-			ws = new WebSocket(getWsUrl());
-			ws.onopen = () => (connected = true);
-			ws.onclose = () => (connected = false);
-			ws.onerror = () => {
-				connected = false;
-				error = 'WebSocket error';
-			};
-			ws.onmessage = (event) => {
-				const message = event.data;
-                if (message.startsWith('mc|')) {
-                    const parts = message.split('|');
-                    if (parts.length === 2) {
-                        const newCount = parseInt(parts[1], 10);
-                        if (!isNaN(newCount)) {
-                            count = newCount;
-                        }
-                    }
-                }
-			};
-		} catch (e) {
-			error = String(e);
-		}
-
-		return () => {
-			try {
-				ws?.close();
-			} catch {
-				// ignore
-			}
-		};
-	});
+  // Function to handle the cow button click
+  function handleCowClick() {
+    alert("Mooooo! The cow says hi!");
+    // You can add more complex logic here later, e.g.,
+    // dispatch an event, navigate to another page, play a sound.
+  }
 </script>
 
-<main>
-	<h1>Global Counter</h1>
-	<p>Count: <strong>{count}</strong></p>
-	<p>Status: {connected ? 'connected' : 'disconnected'}</p>
-	<button type="button" onclick={increment}>Increment</button>
-	{#if error}
-		<p style="color: #b91c1c;">{error}</p>
-	{/if}
-</main>
+<div class="page-container">
+  <!-- Render our animated background component -->
+  <BackgroundScroller />
+
+  <!-- Render our animated cow button component -->
+  <!-- We pass the handleCowClick function to its onClick prop -->
+  <CowButton onClick={handleCowClick} />
+
+  <!-- This is just temporary overlay content, it will sit between background and cow -->
+  <main class="content-overlay">
+    <h1>Welcome to the Moo-ving World!</h1>
+    <p>Click the animated cow!</p>
+  </main>
+</div>
+
+<style>
+  .page-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Optional: Fallback background if images don't load or for debugging */
+    background-color: #87CEEB; /* A light blue sky color */
+  }
+
+  .content-overlay {
+    position: relative;
+    z-index: 5; /* This content is above the background (0) but below the cow (10) */
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    font-family: 'Press Start 2P', cursive, sans-serif; /* Example pixel font */
+    text-align: center;
+    padding: 20px; /* Add some padding so text isn't right on the edge */
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background for readability */
+    border-radius: 8px;
+  }
+  /* Optional: Import a pixel font if you like, e.g., in app.html or via link tag */
+  /*
+  :global(body) {
+    font-family: 'Press Start 2P', cursive, sans-serif;
+  }
+  */
+</style>
