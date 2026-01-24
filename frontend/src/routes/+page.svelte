@@ -4,6 +4,7 @@
 	let count = $state(0);
 	let connected = $state(false);
 	let error = $state('');
+    let ws = null;
 
 	function getWsUrl() {
 		const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -20,20 +21,19 @@
 		}
 	}
 
-	async function increment() {
-		error = '';
-		try {
-			const res = await fetch('/api/increment', { method: 'POST' });
-			const data = await res.json();
-			count = data.count;
-		} catch (e) {
-			error = String(e);
-		}
-	}
+    async function increment() {
+        if (!connected) {
+            error = 'Not connected to WebSocket';
+            return;
+        }
+        try {
+            ws.send("count_moo");
+        } catch (e) {
+            error = String(e);
+        }
+    }
 
 	onMount(() => {
-		let ws;
-
 		refresh();
 
 		try {
@@ -45,12 +45,16 @@
 				error = 'WebSocket error';
 			};
 			ws.onmessage = (event) => {
-				try {
-					const data = JSON.parse(event.data);
-					if (typeof data.count === 'number') count = data.count;
-				} catch {
-					// ignore
-				}
+				const message = event.data;
+                if (message.startsWith('mc|')) {
+                    const parts = message.split('|');
+                    if (parts.length === 2) {
+                        const newCount = parseInt(parts[1], 10);
+                        if (!isNaN(newCount)) {
+                            count = newCount;
+                        }
+                    }
+                }
 			};
 		} catch (e) {
 			error = String(e);
@@ -70,7 +74,7 @@
 	<h1>Global Counter</h1>
 	<p>Count: <strong>{count}</strong></p>
 	<p>Status: {connected ? 'connected' : 'disconnected'}</p>
-	<button type="button" on:click={increment}>Increment</button>
+	<button type="button" onclick={increment}>Increment</button>
 	{#if error}
 		<p style="color: #b91c1c;">{error}</p>
 	{/if}
