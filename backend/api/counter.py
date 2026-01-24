@@ -1,3 +1,5 @@
+# Handles the global moo counter w/ live websocket updates
+
 import threading
 from typing import Set
 
