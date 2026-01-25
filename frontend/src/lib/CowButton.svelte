@@ -1,7 +1,16 @@
 <script>
   import cowSprite from '$lib/assets/images/cow-walk-sprite-2.png';
+    import { blur } from 'svelte/transition';
 
   export let onClick = () => console.log('Moooo! Cow button clicked!');
+
+  function onKeyDown(event) {
+    if (event.repeat) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  }
 
   const SCALE_FACTOR = 10;
 
@@ -20,21 +29,6 @@
   const WALK_DISTANCE = FRAME_WIDTH * NUM_FRAMES;
 </script>
 
-<button
-  class="cow-button"
-  on:click={onClick}
-  aria-label="Clickable animated cow"
-  style="
-    --frame-width: {FRAME_WIDTH}px;
-    --frame-height: {FRAME_HEIGHT}px;
-    --sheet-width: {SHEET_WIDTH}px;
-    --walk-distance: {WALK_DISTANCE}px;
-    --num-frames: {NUM_FRAMES};
-  "
->
-  <div class="cow-sprite-display" style="--cow-sprite-url: url('{cowSprite}');" />
-</button>
-
 <style>
   .cow-button {
     position: absolute;
@@ -48,6 +42,7 @@
     border: none;
     padding: 0;
     cursor: pointer;
+    user-select: none;
   }
 
   .cow-sprite-display {
@@ -69,4 +64,37 @@
     from { background-position: 0 0; }
     to   { background-position: calc(-1 * var(--walk-distance)) 0; }
   }
+
+  .cow-sprite-shadow {
+    pointer-events: none;
+    position: absolute;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 15%;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 50%;
+    filter: blur(4px);
+    z-index: -1;
+  }
 </style>
+
+<button
+  type="button"
+  class="cow-button"
+  on:click={onClick}
+  on:keydown={onKeyDown}
+  aria-label="Clickable animated cow"
+  tabindex="-1"
+  style="
+    --frame-width: {FRAME_WIDTH}px;
+    --frame-height: {FRAME_HEIGHT}px;
+    --sheet-width: {SHEET_WIDTH}px;
+    --walk-distance: {WALK_DISTANCE}px;
+    --num-frames: {NUM_FRAMES};
+  "
+>
+  <div class="cow-sprite-display" style="--cow-sprite-url: url('{cowSprite}');"></div>
+  <div class="cow-sprite-shadow"></div>
+</button>
