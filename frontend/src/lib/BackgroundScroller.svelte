@@ -1,6 +1,6 @@
 <script>
   import skyTexture from '$lib/assets/images/sky-texture.png';
-  import grassTexture from '$lib/assets/images/grass-texture.png';
+  import grassTexture from '$lib/assets/images/actual_tiled_grass_1.png';
 </script>
 
 <div class="background-container">
