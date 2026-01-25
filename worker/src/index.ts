@@ -14,7 +14,10 @@ function parseWebSocketMessage(message: string | ArrayBuffer): string {
 
 export class TotalMooCount implements DurableObject {
 	private readonly state: DurableObjectState;
-	private readonly rateLimit = new Map<WebSocket, { tokens: number; lastRefill: number }>();
+	private readonly rateLimit = new Map<
+		WebSocket,
+		{ tokens: number; lastRefill: number; windowStart: number; windowCount: number }
+	>();
 	private readonly refillPerSecond = 25;
 	private readonly maxBurst = 25;
 
@@ -51,8 +54,28 @@ export class TotalMooCount implements DurableObject {
 		const now = Date.now();
 		const existing = this.rateLimit.get(ws);
 		if (!existing) {
-			this.rateLimit.set(ws, { tokens: this.maxBurst - 1, lastRefill: now });
+			this.rateLimit.set(ws, {
+				tokens: this.maxBurst - 1,
+				lastRefill: now,
+				windowStart: now,
+				windowCount: 1,
+			});
 			return true;
+		}
+
+		if (now - existing.windowStart >= 1000) {
+			existing.windowStart = now;
+			existing.windowCount = 0;
+		}
+		existing.windowCount += 1;
+		if (existing.windowCount > this.refillPerSecond * 1.5) {
+			this.rateLimit.delete(ws);
+			try {
+				ws.close(1008, "Rate limit exceeded");
+			} catch {
+				// Ignore close failures.
+			}
+			return false;
 		}
 
 		const elapsedMs = now - existing.lastRefill;
