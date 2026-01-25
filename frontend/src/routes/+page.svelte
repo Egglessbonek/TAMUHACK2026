@@ -25,6 +25,11 @@
   let wsStatus: 'connecting' | 'online' | 'offline' = 'connecting';
   let ws: WebSocket | null = null;
 
+  const FLUSH_INTERVAL_MS = 100;
+  const MAX_BATCH = 20;
+  let pendingClicks = 0;
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
   const PREFETCH_QUEUE_SIZE = 15;
   let prefetchQueue: string[] = [];
   
@@ -57,6 +62,7 @@
 
     ws.addEventListener('open', () => {
       wsStatus = 'online';
+      flushPendingClicks();
     });
 
     ws.addEventListener('message', (event: MessageEvent) => {
@@ -73,6 +79,31 @@
       wsStatus = 'offline';
       try { ws?.close(); } catch {}
     });
+  }
+
+  function scheduleFlush() {
+    if (flushTimer) return;
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      flushPendingClicks();
+    }, FLUSH_INTERVAL_MS);
+  }
+
+  function flushPendingClicks() {
+    if (pendingClicks <= 0) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      scheduleFlush();
+      return;
+    }
+
+    const batch = Math.min(pendingClicks, MAX_BATCH);
+    pendingClicks -= batch;
+
+    try {
+      ws.send(`inc:${batch}`);
+    } catch {}
+
+    if (pendingClicks > 0) scheduleFlush();
   }
 
   function resolveSoundUrl(id: string): string | null {
@@ -194,6 +225,11 @@
     return () => {
       try { ws?.close(); } catch {}
 
+      if (flushTimer) {
+        try { clearTimeout(flushTimer); } catch {}
+        flushTimer = null;
+      }
+
       for (const audio of activeAudios) {
         try { audio.pause(); } catch {}
       }
@@ -213,9 +249,8 @@
 
   // Function to handle the cow button click
   function handleCowClick() {
-    try {
-      if (ws?.readyState === WebSocket.OPEN) ws.send('increment');
-    } catch {}
+    pendingClicks += 1;
+    scheduleFlush();
 
     fadeOutAllPlaying(FADE_OUT_SECONDS);
 
@@ -244,8 +279,8 @@
 
   <main class="content-overlay">
     <div class="moo-display" aria-live="polite">
-      <!-- <span class="moo-value">{totalMoos ?? '—'}</span> TEMPORARILY OFFLINE -->
-      <span class="moo-value">👷 We have to MOOve things around, the button will be back soon!</span>
+      <span class="moo-value">{totalMoos ?? '—'}</span>
+      <!-- <span class="moo-value">👷 We have to MOOve things around, the button will be back soon!</span> -->
     </div>
   </main>
 

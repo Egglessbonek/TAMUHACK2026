@@ -14,28 +14,58 @@ function parseWebSocketMessage(message: string | ArrayBuffer): string {
 
 export class TotalMooCount implements DurableObject {
 	private readonly state: DurableObjectState;
-	private readonly rateLimit = new Map<
-		WebSocket,
+	private count: number | null = null;
+	private readonly rateLimitByIp = new Map<
+		string,
 		{ tokens: number; lastRefill: number; windowStart: number; windowCount: number }
 	>();
+	private readonly wsToIp = new Map<WebSocket, string>();
 	private readonly refillPerSecond = 25;
 	private readonly maxBurst = 25;
+	private readonly persistIntervalMs = 1000;
+	private readonly broadcastIntervalMs = 100;
+	private persistTimer: ReturnType<typeof setTimeout> | null = null;
+	private broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(state: DurableObjectState) {
 		this.state = state;
 	}
 
-	private async getCount(): Promise<number> {
-		return (await this.state.storage.get<number>("count")) ?? 0;
+	private async ensureCountLoaded(): Promise<number> {
+		if (this.count === null) {
+			this.count = (await this.state.storage.get<number>("count")) ?? 0;
+		}
+		return this.count;
 	}
 
-	private async increment(): Promise<number> {
-		return this.state.storage.transaction(async (txn) => {
-			const current = (await txn.get<number>("count")) ?? 0;
-			const next = current + 1;
-			await txn.put("count", next);
-			return next;
-		});
+	private schedulePersist(): void {
+		if (this.persistTimer !== null) return;
+		this.persistTimer = setTimeout(() => {
+			this.persistTimer = null;
+			void this.flushCountToStorage();
+		}, this.persistIntervalMs);
+	}
+
+	private async flushCountToStorage(): Promise<void> {
+		if (this.count === null) return;
+		await this.state.storage.put("count", this.count);
+	}
+
+	private scheduleBroadcast(): void {
+		if (this.broadcastTimer !== null) return;
+		this.broadcastTimer = setTimeout(() => {
+			this.broadcastTimer = null;
+			if (this.count !== null) this.broadcastCount(this.count);
+		}, this.broadcastIntervalMs);
+	}
+
+	private async add(delta: number): Promise<number> {
+		const current = await this.ensureCountLoaded();
+		const next = current + delta;
+		this.count = next;
+		this.schedulePersist();
+		this.scheduleBroadcast();
+		return next;
 	}
 
 	private broadcastCount(value: number): void {
@@ -50,15 +80,18 @@ export class TotalMooCount implements DurableObject {
 		}
 	}
 
-	private allowIncrement(ws: WebSocket): boolean {
+	private allowIncrement(ip: string, ws: WebSocket | undefined, amount: number): boolean {
+		const cost = Math.max(1, Math.floor(amount));
+		if (cost > this.maxBurst) return false;
+
 		const now = Date.now();
-		const existing = this.rateLimit.get(ws);
+		const existing = this.rateLimitByIp.get(ip);
 		if (!existing) {
-			this.rateLimit.set(ws, {
-				tokens: this.maxBurst - 1,
+			this.rateLimitByIp.set(ip, {
+				tokens: this.maxBurst - cost,
 				lastRefill: now,
 				windowStart: now,
-				windowCount: 1,
+				windowCount: cost,
 			});
 			return true;
 		}
@@ -67,13 +100,15 @@ export class TotalMooCount implements DurableObject {
 			existing.windowStart = now;
 			existing.windowCount = 0;
 		}
-		existing.windowCount += 1;
+		existing.windowCount += cost;
 		if (existing.windowCount > this.refillPerSecond * 1.5) {
-			this.rateLimit.delete(ws);
-			try {
-				ws.close(1008, "Rate limit exceeded");
-			} catch {
-				// Ignore close failures.
+			this.rateLimitByIp.delete(ip);
+			if (ws) {
+				try {
+					ws.close(1008, "Rate limit exceeded");
+				} catch {
+					// Ignore close failures.
+				}
 			}
 			return false;
 		}
@@ -85,11 +120,11 @@ export class TotalMooCount implements DurableObject {
 			existing.lastRefill = now;
 		}
 
-		if (existing.tokens < 1) {
+		if (existing.tokens < cost) {
 			return false;
 		}
 
-		existing.tokens -= 1;
+		existing.tokens -= cost;
 		return true;
 	}
 
@@ -106,16 +141,22 @@ export class TotalMooCount implements DurableObject {
 			const server = pair[1];
 
 			this.state.acceptWebSocket(server);
+			const ipHeader =
+				request.headers.get("cf-connecting-ip") ||
+				request.headers.get("x-forwarded-for") ||
+				"unknown";
+			const ip = ipHeader.split(",")[0].trim() || "unknown";
+			this.wsToIp.set(server, ip);
 
 			// Send the current count immediately on connect.
-			const current = await this.getCount();
+			const current = await this.ensureCountLoaded();
 			server.send(String(current));
 
 			return new Response(null, { status: 101, webSocket: client });
 		}
 
 		if (url.pathname === "/count") {
-			const current = await this.getCount();
+			const current = await this.ensureCountLoaded();
 			return new Response(String(current), {
 				headers: { "content-type": "text/plain; charset=utf-8" },
 			});
@@ -126,18 +167,32 @@ export class TotalMooCount implements DurableObject {
 
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
 		const text = parseWebSocketMessage(message).trim();
+		let amount = 0;
 		if (!text || text === "increment") {
-			if (!this.allowIncrement(ws)) {
+			amount = 1;
+		} else if (text.startsWith("inc:")) {
+			const parsed = Number(text.slice(4));
+			if (Number.isFinite(parsed) && parsed > 0) {
+				amount = Math.floor(parsed);
+			}
+		}
+
+		if (amount > 0) {
+			const ip = this.wsToIp.get(ws) ?? "unknown";
+			if (!this.allowIncrement(ip, ws, amount)) {
 				return;
 			}
-			const next = await this.increment();
-			this.broadcastCount(next);
+			await this.add(amount);
 			return;
 		}
 	}
 
 	async webSocketClose(ws: WebSocket): Promise<void> {
-		this.rateLimit.delete(ws);
+		const ip = this.wsToIp.get(ws);
+		this.wsToIp.delete(ws);
+		if (ip && !this.state.getWebSockets().some((socket) => this.wsToIp.get(socket) === ip)) {
+			this.rateLimitByIp.delete(ip);
+		}
 	}
 }
 
@@ -149,15 +204,14 @@ export default {
 		}
 
 		const stub = getTotalMooCountStub(env);
+		const doUrl = new URL(url);
+		doUrl.pathname = url.pathname;
 
-		if (url.pathname === "/ws") {
-			// Route the WebSocket upgrade to the single Durable Object instance.
-			return stub.fetch(new Request(url.toString(), request));
+		if (doUrl.pathname === "/ws") {
+			return stub.fetch(new Request(doUrl.toString(), request));
 		}
 
-		if (url.pathname === "/count") {
-			const doUrl = new URL(url);
-			doUrl.pathname = "/count";
+		if (doUrl.pathname === "/count") {
 			return stub.fetch(new Request(doUrl.toString(), { method: "GET" }));
 		}
 
