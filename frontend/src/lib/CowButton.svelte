@@ -1,8 +1,22 @@
 <script>
   import cowSprite from '$lib/assets/images/cow-walk-sprite-2.png';
-    import { blur } from 'svelte/transition';
+  import realCow from '$lib/assets/images/holstein-cow.png';
 
   export let onClick = () => console.log('Moooo! Cow button clicked!');
+
+  let isReal = false;
+  let realTimeout;
+
+  function handleClick() {
+    if (Math.random() < 0.01) {
+      clearTimeout(realTimeout);
+      isReal = true;
+      realTimeout = setTimeout(() => {
+        isReal = false;
+      }, 500);
+    }
+    onClick();
+  }
 
   function onKeyDown(event) {
     if (event.repeat) return;
@@ -13,19 +27,12 @@
   }
 
   const SCALE_FACTOR = 10;
-
   const ORIGINAL_FRAME_WIDTH = 50;
   const ORIGINAL_FRAME_HEIGHT = 36;
-
   const NUM_FRAMES = 6;
-
   const FRAME_WIDTH = ORIGINAL_FRAME_WIDTH * SCALE_FACTOR;
   const FRAME_HEIGHT = ORIGINAL_FRAME_HEIGHT * SCALE_FACTOR;
-
-  // total sprite sheet width when displayed
   const SHEET_WIDTH = FRAME_WIDTH * NUM_FRAMES;
-
-  // how far to move to reach the last frame (0..NUM_FRAMES-1)
   const WALK_DISTANCE = FRAME_WIDTH * NUM_FRAMES;
 </script>
 
@@ -50,13 +57,9 @@
     height: 100%;
     background-image: var(--cow-sprite-url);
     background-repeat: no-repeat;
-
-    /* scale the whole sheet to the intended pixel size */
     background-size: var(--sheet-width) var(--frame-height);
-
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-
     animation: cowWalk 0.8s steps(var(--num-frames)) infinite;
   }
 
@@ -78,12 +81,20 @@
     filter: blur(4px);
     z-index: -1;
   }
+
+  .cow-real {
+    width: 100%;
+    height: 100%;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
 </style>
 
 <button
   type="button"
   class="cow-button"
-  on:click={onClick}
+  on:click={handleClick}
   on:keydown={onKeyDown}
   aria-label="Clickable animated cow"
   tabindex="-1"
@@ -95,6 +106,10 @@
     --num-frames: {NUM_FRAMES};
   "
 >
-  <div class="cow-sprite-display" style="--cow-sprite-url: url('{cowSprite}');"></div>
-  <div class="cow-sprite-shadow"></div>
+  {#if isReal}
+    <div class="cow-real" style="background-image: url('{realCow}');"></div>
+  {:else}
+    <div class="cow-sprite-display" style="--cow-sprite-url: url('{cowSprite}');"></div>
+  {/if}
+    <div class="cow-sprite-shadow"></div>
 </button>

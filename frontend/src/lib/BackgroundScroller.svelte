@@ -1,5 +1,5 @@
 <script>
-  import skyTexture from '$lib/assets/images/sky-texture.png';
+  import skyTexture from '$lib/assets/images/actual_many_clouds.png';
   import grassTexture1 from '$lib/assets/images/actual_tiled_grass_1_2x.png';
   import grassTexture2 from '$lib/assets/images/actual_tiled_grass_2_2x.png';
 
@@ -83,7 +83,7 @@
   }
 
   .scroll-sky {
-    background-size: auto 100%;
+    background-size: auto 80%;
   }
 
   .scroll-grass {
