@@ -23,6 +23,12 @@
 			"tag": "v1",
 			"new_sqlite_classes": ["TotalMooCount"]
 		}
+	],
+	"routes": [
+		{
+			"pattern": "moofor.me/api/*",
+			"zone_name": "moofor.me"
+		}
 	]
 	/**
 	 * Smart Placement

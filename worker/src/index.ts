@@ -77,19 +77,9 @@ export class TotalMooCount implements DurableObject {
 
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
 		const text = parseWebSocketMessage(message).trim();
-		if (!text || text === "count") {
+		if (!text || text === "increment") {
 			const next = await this.increment();
 			this.broadcastCount(next);
-			return;
-		}
-
-		if (text === "count") {
-			try {
-				const current = await this.getCount();
-				ws.send(String(current));
-			} catch {
-				// ignore
-			}
 			return;
 		}
 	}
@@ -98,15 +88,19 @@ export class TotalMooCount implements DurableObject {
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
+		if (url.pathname.startsWith("/api/")) {
+			url.pathname = url.pathname.replace(/^\/api/, "");
+		}
+
 		const stub = getTotalMooCountStub(env);
 
 		if (url.pathname === "/ws") {
 			// Route the WebSocket upgrade to the single Durable Object instance.
-			return stub.fetch(request);
+			return stub.fetch(new Request(url.toString(), request));
 		}
 
 		if (url.pathname === "/count") {
-			const doUrl = new URL(request.url);
+			const doUrl = new URL(url);
 			doUrl.pathname = "/count";
 			return stub.fetch(new Request(doUrl.toString(), { method: "GET" }));
 		}

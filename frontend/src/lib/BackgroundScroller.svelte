@@ -43,7 +43,7 @@
     bottom: 0;
     top: auto;
     background-size: auto 100%;
-    animation: scrollGrass 5s linear infinite;
+    animation: scrollGrass 10s linear infinite;
   }
 
   /* Move by a fixed pixel distance; repeat-x makes it seamless */

@@ -11,7 +11,12 @@
 
   function wsUrl(pathname: string): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}${pathname}`;
+    // local
+    let host = window.location.hostname;
+    if (window.location.hostname === 'localhost') {
+      host = 'moofor.me';
+    }
+    return `${proto}//${host}${pathname}`;
   }
 
   function connect() {
@@ -47,9 +52,16 @@
 
   // Function to handle the cow button click
   function handleCowClick() {
+    console.log('Cow clicked!');
+    console.log(ws?.readyState, WebSocket.OPEN);
     try {
+      console.log('Sending increment message to server');
       if (ws?.readyState === WebSocket.OPEN) ws.send('increment');
+      console.log('Sent increment message to server');
     } catch {}
+
+    // play cow sound
+    const audio = new Audio('/src/lib/assets/images/');
   }
 </script>
 
@@ -62,9 +74,8 @@
   <CowButton onClick={handleCowClick} />
 
   <main class="content-overlay">
-    <div class="moo-counter" aria-live="polite">
-      <span class="moo-counter__label">TOTAL MOOS</span>
-      <span class="moo-counter__value">{totalMoos ?? '—'}</span>
+    <div class="moo-display" aria-live="polite">
+      <span class="moo-value">{totalMoos ?? '—'}</span>
     </div>
   </main>
 </div>
@@ -89,12 +100,12 @@
     text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
     font-family: 'Press Start 2P', cursive, sans-serif; /* Example pixel font */
     text-align: center;
-    padding: 20px; /* Add some padding so text isn't right on the edge */
+    padding: 20px 20px 5px 20px; /* Add some padding so text isn't right on the edge */
     background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background for readability */
     border-radius: 4px;
   }
 
-  .moo-counter {
+  .moo-display {
     font-size: 1.5rem;
     margin-bottom: 1rem;
     display: flex;
@@ -103,7 +114,7 @@
     align-items: baseline;
   }
 
-  .moo-counter__value {
+  .moo-value {
     font-variant-numeric: tabular-nums;
     min-width: 2ch;
     text-align: right;
