@@ -13,7 +13,7 @@
     z-index: 0;
     /* Use a fixed pixel segment width to avoid subpixel seams at segment boundaries.
        Pick a multiple of your tile size (256/512/etc). */
-    --segment-width: 4920px;
+    --segment-width: 6912px;
     --sky-scroll-speed: 35px;
     --grass-scroll-speed: 160px;
   }
