@@ -14,6 +14,9 @@ function parseWebSocketMessage(message: string | ArrayBuffer): string {
 
 export class TotalMooCount implements DurableObject {
 	private readonly state: DurableObjectState;
+	private readonly rateLimit = new Map<WebSocket, { tokens: number; lastRefill: number }>();
+	private readonly refillPerSecond = 25;
+	private readonly maxBurst = 25;
 
 	constructor(state: DurableObjectState) {
 		this.state = state;
@@ -42,6 +45,29 @@ export class TotalMooCount implements DurableObject {
 				// Ignore send failures; Cloudflare will clean up broken sockets.
 			}
 		}
+	}
+
+	private allowIncrement(ws: WebSocket): boolean {
+		const now = Date.now();
+		const existing = this.rateLimit.get(ws);
+		if (!existing) {
+			this.rateLimit.set(ws, { tokens: this.maxBurst - 1, lastRefill: now });
+			return true;
+		}
+
+		const elapsedMs = now - existing.lastRefill;
+		if (elapsedMs > 0) {
+			const refill = (elapsedMs / 1000) * this.refillPerSecond;
+			existing.tokens = Math.min(this.maxBurst, existing.tokens + refill);
+			existing.lastRefill = now;
+		}
+
+		if (existing.tokens < 1) {
+			return false;
+		}
+
+		existing.tokens -= 1;
+		return true;
 	}
 
 	async fetch(request: Request): Promise<Response> {
@@ -78,10 +104,17 @@ export class TotalMooCount implements DurableObject {
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
 		const text = parseWebSocketMessage(message).trim();
 		if (!text || text === "increment") {
+			if (!this.allowIncrement(ws)) {
+				return;
+			}
 			const next = await this.increment();
 			this.broadcastCount(next);
 			return;
 		}
+	}
+
+	async webSocketClose(ws: WebSocket): Promise<void> {
+		this.rateLimit.delete(ws);
 	}
 }
 
