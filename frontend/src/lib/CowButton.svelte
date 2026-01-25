@@ -7,6 +7,9 @@
   let isReal = false;
   let realTimeout;
 
+  let isClicked = false;
+  let clickTimeout;
+
   function handleClick() {
     if (Math.random() < 0.01) {
       clearTimeout(realTimeout);
@@ -14,6 +17,12 @@
       realTimeout = setTimeout(() => {
         isReal = false;
       }, 500);
+    } else if (!isReal) {
+      isClicked = true;
+      clearTimeout(clickTimeout);
+      clickTimeout = setTimeout(() => {
+        isClicked = false;
+      }, 150);
     }
     onClick();
   }
@@ -50,6 +59,11 @@
     padding: 0;
     cursor: pointer;
     user-select: none;
+    transition: transform 0.1s ease-in-out;
+  }
+
+  .cow-button.clicked {
+    transform: translate(-50%, -40%);
   }
 
   .cow-sprite-display {
@@ -94,6 +108,7 @@
 <button
   type="button"
   class="cow-button"
+  class:clicked={isClicked}
   on:click={handleClick}
   on:keydown={onKeyDown}
   aria-label="Clickable animated cow"

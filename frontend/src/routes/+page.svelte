@@ -27,6 +27,9 @@
 
   const PREFETCH_QUEUE_SIZE = 15;
   let prefetchQueue: string[] = [];
+  
+  // Night Mode State
+  let isNightMode = false;
 
   const BASE_VOLUME = 0.5;
   const FADE_OUT_SECONDS = 0.5;
@@ -221,11 +224,19 @@
     playSound(nextId);
     topUpPrefetchQueue();
   }
+
+  function toggleNightMode() {
+    isNightMode = !isNightMode;
+  }
 </script>
 
-<div class="page-container">
+<div class="page-container" class:night-mode={isNightMode}>
   <!-- Render our animated background component -->
   <BackgroundScroller />
+  
+  {#if isNightMode}
+    <div class="night-tint"></div>
+  {/if}
 
   <!-- Render our animated cow button component -->
   <!-- We pass the handleCowClick function to its onClick prop -->
@@ -236,6 +247,10 @@
       <span class="moo-value">{totalMoos ?? '—'}</span>
     </div>
   </main>
+
+  <button class="mode-toggle" on:click={toggleNightMode} aria-label="Toggle Night Mode">
+    {isNightMode ? '☀️ Day' : '🌙 Night'}
+  </button>
 </div>
 
 <style>
@@ -246,8 +261,51 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Optional: Fallback background if images don't load or for debugging */
-    background-color: #87CEEB; /* A light blue sky color */
+    user-select: none;
+    /* Day background color */
+    background: linear-gradient(180deg, #5197d0 0%, #87CEEB 50%);
+    transition: background-color 0.3s;
+  }
+
+  .page-container.night-mode {
+    /* Night background color */
+    background: linear-gradient(180deg, #1d2a3e 0%, #6768c9 50%);
+  }
+
+  .night-tint {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.3); /* 40% darker tint */
+    z-index: 1; /* Above background (0), below cow (10) and overlay (5) */
+    pointer-events: none;
+  }
+
+  .mode-toggle {
+    position: absolute;
+    top: 1rem;  
+    right: 1rem;
+    z-index: 20;
+    padding: 15px;
+    font-family: 'Press Start 2P', cursive, sans-serif;
+    font-size: 0.8rem;
+    cursor: pointer;
+    
+    color: white;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.7);
+    background-color: rgba(0, 0, 0, 0.3);
+    border: none;
+    border-radius: 4px;
+    user-select: text;
+    
+    transition: background-color 0.2s, transform 0.1s;
+  }
+
+  .mode-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  .mode-toggle:active {
+    transform: scale(0.95);
   }
   
   .content-overlay {
@@ -255,12 +313,13 @@
     top: 1rem;
     z-index: 5; /* This content is above the background (0) but below the cow (10) */
     color: white;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.7);
     font-family: 'Press Start 2P', cursive, sans-serif; /* Example pixel font */
     text-align: center;
     padding: 20px 20px 5px 20px; /* Add some padding so text isn't right on the edge */
     background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background for readability */
     border-radius: 4px;
+    user-select: text;
   }
 
   .moo-display {
