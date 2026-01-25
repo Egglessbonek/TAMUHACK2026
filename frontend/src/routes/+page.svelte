@@ -29,7 +29,7 @@
   let prefetchQueue: string[] = [];
 
   const BASE_VOLUME = 0.5;
-  const FADE_OUT_SECONDS = 0.1;
+  const FADE_OUT_SECONDS = 0.5;
   const activeAudios = new Set<HTMLAudioElement>();
   const fadingAudios = new Set<HTMLAudioElement>();
   const fadeOutRafByAudio = new Map<HTMLAudioElement, number>();
@@ -132,7 +132,7 @@
 
     const tick = (now: number) => {
       const t = Math.min(1, (now - startAt) / durationMs);
-      audio.volume = startVol * (1 - t);
+      audio.volume = startVol * Math.sqrt(1 - t);
       if (t < 1 && !audio.paused) {
         const raf = requestAnimationFrame(tick);
         fadeOutRafByAudio.set(audio, raf);
@@ -217,7 +217,7 @@
     fadeOutAllPlaying(FADE_OUT_SECONDS);
 
     // Play from the prefetch queue (and immediately top it up to stay 10 ahead).
-    const nextId = prefetchQueue.shift() ?? randomSoundId();
+    const nextId = prefetchQueue.shift() ?? Math.floor(Math.random() * 101).toString().padStart(3, '0');
     playSound(nextId);
     topUpPrefetchQueue();
   }
