@@ -1,10 +1,8 @@
 <script lang="ts">
-  // Import both components
   import BackgroundScroller from '$lib/BackgroundScroller.svelte';
   import CowButton from '$lib/CowButton.svelte';
   import { onMount } from 'svelte';
 
-  // Resolve sound assets to final URLs at build time (works in dev + production).
   import ultraRareUrl from '$lib/assets/sounds/ultra_rare_cow_sound.mp3?url';
   const cowSoundUrlModules = import.meta.glob('$lib/assets/sounds/cow_sounds_*.mp3', {
     eager: true,
@@ -25,8 +23,8 @@
   let wsStatus: 'connecting' | 'online' | 'offline' = 'connecting';
   let ws: WebSocket | null = null;
 
-  const FLUSH_INTERVAL_MS = 100;
-  const MAX_BATCH = 20;
+  const FLUSH_INTERVAL_MS = 500;
+  const MAX_BATCH = 40;
   let pendingClicks = 0;
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -254,7 +252,7 @@
 
     fadeOutAllPlaying(FADE_OUT_SECONDS);
 
-    // Play from the prefetch queue (and immediately top it up to stay 10 ahead).
+    // Play from the prefetch queue (and immediately top it up to stay N ahead).
     const nextId = prefetchQueue.shift() ?? Math.floor(Math.random() * 101).toString().padStart(3, '0');
     playSound(nextId);
     topUpPrefetchQueue();

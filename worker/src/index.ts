@@ -21,9 +21,9 @@ export class TotalMooCount implements DurableObject {
 	>();
 	private readonly wsToIp = new Map<WebSocket, string>();
 	private readonly refillPerSecond = 25;
-	private readonly maxBurst = 25;
-	private readonly persistIntervalMs = 1000;
-	private readonly broadcastIntervalMs = 100;
+	private readonly maxBurst = 40;
+	private readonly persistIntervalMs = 30000;
+	private readonly broadcastIntervalMs = 250;
 	private persistTimer: ReturnType<typeof setTimeout> | null = null;
 	private broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -175,6 +175,9 @@ export class TotalMooCount implements DurableObject {
 			if (Number.isFinite(parsed) && parsed > 0) {
 				amount = Math.floor(parsed);
 			}
+			// max frontend batch 
+			const MAX_BATCH = 40;
+			amount = MAX_BATCH < amount ? MAX_BATCH : amount;
 		}
 
 		if (amount > 0) {
