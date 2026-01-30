@@ -94,6 +94,10 @@ export class TotalMooCount implements DurableObject {
 		if (url.pathname === "/ws") {
 			if (request.headers.get("Upgrade") !== "websocket") {
 				return new Response("Expected WebSocket upgrade", { status: 426 });
+			} 
+
+			if (request.headers.get("Origin") !== "https://moofor.me") {
+				return new Response("Invalid origin", { status: 403 });
 			}
 
 			const pair = new WebSocketPair();
