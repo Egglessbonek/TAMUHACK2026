@@ -60,6 +60,7 @@
     cursor: pointer;
     user-select: none;
     transition: transform 0.1s ease-in-out;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .cow-button.clicked {
