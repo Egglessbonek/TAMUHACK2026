@@ -5,11 +5,17 @@
 
 <svelte:head>
   <link rel="icon" href={favicon} />
+  <link rel="preconnect" href="https://challenges.cloudflare.com">
+  <script
+  src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+  async
+  defer
+></script>
 </svelte:head>
 
 <!-- This is where the content of your pages (+page.svelte) will be rendered -->
 {@render children()}
-
+<div class="cf-turnstile" data-sitekey="0x4AAAAAACWP-TZOq5SLv5yT" data-theme="dark"></div>
 <style>
   /*
     :global() applies styles globally, outside the component's scope.

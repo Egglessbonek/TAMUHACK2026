@@ -1,5 +1,6 @@
 export interface Env {
 	TOTAL_MOO_COUNT: DurableObjectNamespace;
+	TURNSTILE_SECRET_KEY: string;
 }
 
 function getTotalMooCountStub(env: Env): DurableObjectStub {
@@ -199,11 +200,53 @@ export class TotalMooCount implements DurableObject {
 	}
 }
 
+async function validateTurnstile(token: string, remoteip: string, secretKey: string): Promise<any> {
+	const formData = new FormData();
+	formData.append('secret', secretKey);
+	formData.append('response', token);
+	formData.append('remoteip', remoteip);
+
+	try {
+		const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+			method: 'POST',
+			body: formData
+		});
+
+		const result: any = await response.json();
+		return result;
+	} catch (error) {
+		console.error('Turnstile validation error:', error);
+		return { success: false, 'error-codes': ['internal-error'] };
+	}
+}
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		if (url.pathname.startsWith("/api/")) {
 			url.pathname = url.pathname.replace(/^\/api/, "");
+		}
+
+		if (url.pathname === "/submit" && request.method === "POST") {
+			const body = await request.formData();
+			const token = body.get('cf-turnstile-response') as string;
+			const ip = request.headers.get('CF-Connecting-IP') ||
+				request.headers.get('X-Forwarded-For') ||
+				'unknown';
+
+			const validation = await validateTurnstile(token, ip, env.TURNSTILE_SECRET_KEY);
+
+			if (validation.success) {
+				return new Response(JSON.stringify({ success: true, message: "Valid submission" }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" }
+				});
+			} else {
+				return new Response(JSON.stringify({ success: false, error: "Invalid verification", details: validation['error-codes'] }), {
+					status: 400,
+					headers: { "Content-Type": "application/json" }
+				});
+			}
 		}
 
 		const stub = getTotalMooCountStub(env);
