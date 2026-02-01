@@ -19,9 +19,12 @@ export class TotalMooCount implements DurableObject {
 	private readonly lastBatchBySocket = new Map<WebSocket, number>();
 	private readonly activeClearances = new Map<string, WebSocket>();
 	private readonly wsToClearance = new Map<WebSocket, string>();
+	private readonly revokedClearances = new Set<string>();
+	private readonly abuseHistoryBySocket = new Map<WebSocket, boolean[]>();
 	private readonly batchIntervalMs = 500;
+	private readonly MAX_BATCH = 40;
 	private readonly persistIntervalMs = 30000;
-	private readonly broadcastIntervalMs = 500;
+	private readonly broadcastIntervalMs = 250;
 	private persistTimer: ReturnType<typeof setTimeout> | null = null;
 	private broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -111,6 +114,12 @@ export class TotalMooCount implements DurableObject {
 			}
 			const clearanceId = match[1];
 
+			if (this.revokedClearances.has(clearanceId)) {
+				const headers = new Headers();
+				headers.set("Set-Cookie", "cf_clearance=; Path=/; Secure; SameSite=None; Max-Age=0; HttpOnly");
+				return new Response("Clearance revoked due to abuse", { status: 403, headers });
+			}
+
 			// New connection invalidates old one if sharing same clearance.
 			const existingWs = this.activeClearances.get(clearanceId);
 			if (existingWs) {
@@ -153,12 +162,49 @@ export class TotalMooCount implements DurableObject {
 		let amount = 0;
 		if (text.startsWith("inc:")) {
 			const parsed = Number(text.slice(4));
+
+			// Abuse prevention: checking if MAX_BATCH is exceeded
+			const exceeded = Number.isFinite(parsed) && parsed > this.MAX_BATCH;
+
+			// Update history
+			let history = this.abuseHistoryBySocket.get(ws);
+			if (!history) {
+				history = [];
+				this.abuseHistoryBySocket.set(ws, history);
+			}
+			history.push(exceeded);
+			if (history.length > 10) {
+				history.shift();
+			}
+
+			// Check condition: 5 times in last 10
+			const exceededCount = history.filter(x => x).length;
+			if (exceededCount >= 5) {
+				// Revoke clearance
+				const clearanceId = this.wsToClearance.get(ws);
+				if (clearanceId) {
+					this.activeClearances.delete(clearanceId);
+					this.wsToClearance.delete(ws);
+					this.revokedClearances.add(clearanceId);
+					// auto-expire revocation after 2 hours (same as cookie max-age)
+					setTimeout(() => {
+						this.revokedClearances.delete(clearanceId);
+					}, 2 * 60 * 60 * 1000);
+				}
+				// Kill websocket
+				try {
+					ws.close(1008, "Rate limit exceeded (abuse detected)");
+				} catch { }
+				this.lastBatchBySocket.delete(ws);
+				this.abuseHistoryBySocket.delete(ws);
+				return;
+			}
+
 			if (Number.isFinite(parsed) && parsed > 0) {
 				amount = Math.floor(parsed);
 			}
 			// max frontend batch 
-			const MAX_BATCH = 40;
-			amount = MAX_BATCH < amount ? MAX_BATCH : amount;
+			amount = this.MAX_BATCH < amount ? this.MAX_BATCH : amount;
 		} else {
 			// invalid message
 			return;
@@ -175,6 +221,7 @@ export class TotalMooCount implements DurableObject {
 
 	async webSocketClose(ws: WebSocket): Promise<void> {
 		this.lastBatchBySocket.delete(ws);
+		this.abuseHistoryBySocket.delete(ws);
 		const clearanceId = this.wsToClearance.get(ws);
 		if (clearanceId) {
 			this.activeClearances.delete(clearanceId);
