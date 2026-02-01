@@ -17,6 +17,8 @@ export class TotalMooCount implements DurableObject {
 	private readonly state: DurableObjectState;
 	private count: number | null = null;
 	private readonly lastBatchBySocket = new Map<WebSocket, number>();
+	private readonly activeClearances = new Map<string, WebSocket>();
+	private readonly wsToClearance = new Map<WebSocket, string>();
 	private readonly batchIntervalMs = 500;
 	private readonly persistIntervalMs = 30000;
 	private readonly broadcastIntervalMs = 500;
@@ -101,11 +103,34 @@ export class TotalMooCount implements DurableObject {
 				return new Response("Invalid origin", { status: 403 });
 			}
 
+			// Initial clearance check:
+			const cookie = request.headers.get("Cookie") || "";
+			const match = cookie.match(/cf_clearance=([^;]+)/);
+			if (!match) {
+				return new Response("Missing cf_clearance cookie", { status: 403 });
+			}
+			const clearanceId = match[1];
+
+			// New connection invalidates old one if sharing same clearance.
+			const existingWs = this.activeClearances.get(clearanceId);
+			if (existingWs) {
+				try {
+					existingWs.close(1008, "Session overlap");
+				} catch { }
+				this.activeClearances.delete(clearanceId);
+				this.wsToClearance.delete(existingWs);
+				this.lastBatchBySocket.delete(existingWs);
+			}
+
 			const pair = new WebSocketPair();
 			const client = pair[0];
 			const server = pair[1];
 
 			this.state.acceptWebSocket(server);
+
+			this.activeClearances.set(clearanceId, server);
+			this.wsToClearance.set(server, clearanceId);
+
 			// Send the current count immediately on connect.
 			const current = await this.ensureCountLoaded();
 			server.send(String(current));
@@ -150,6 +175,11 @@ export class TotalMooCount implements DurableObject {
 
 	async webSocketClose(ws: WebSocket): Promise<void> {
 		this.lastBatchBySocket.delete(ws);
+		const clearanceId = this.wsToClearance.get(ws);
+		if (clearanceId) {
+			this.activeClearances.delete(clearanceId);
+			this.wsToClearance.delete(ws);
+		}
 	}
 }
 
@@ -190,9 +220,15 @@ export default {
 			const validation = await validateTurnstile(token, ip, env.TURNSTILE_SECRET_KEY);
 
 			if (validation.success) {
+				const clearanceId = crypto.randomUUID();
+				const headers = new Headers();
+				headers.set("Content-Type", "application/json");
+				// cookie expires in 2 hours
+				headers.set("Set-Cookie", `cf_clearance=${clearanceId}; Path=/; Secure; SameSite=None; Max-Age=7200; HttpOnly`);
+
 				return new Response(JSON.stringify({ success: true, message: "Valid submission" }), {
 					status: 200,
-					headers: { "Content-Type": "application/json" }
+					headers
 				});
 			} else {
 				return new Response(JSON.stringify({ success: false, error: "Invalid verification", details: validation['error-codes'] }), {

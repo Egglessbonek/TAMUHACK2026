@@ -1,4 +1,7 @@
 declare global {
+    interface Window {
+        onTurnstileSuccess: (token: string) => void;
+    }
     namespace App {
         // interface Error {}
         // interface Locals {}

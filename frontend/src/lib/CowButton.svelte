@@ -24,7 +24,7 @@
         isClicked = false;
       }, 150);
     }
-    onClick();
+    onClick(); // why do we need this?? we dont right???
   }
 
   function onKeyDown(event) {
