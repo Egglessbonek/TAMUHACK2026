@@ -158,13 +158,13 @@
   }
 
   @keyframes fallbackSky {
-    from { background-position: 0 0; }
-    to   { background-position: calc(-1 * var(--segment-width)) 0; }
+    from { background-position: calc(-1 * var(--segment-width)) 0; }
+    to   { background-position: 0 0; }
   }
 
   @keyframes fallbackGrass {
-    from { background-position: 0 0; }
-    to   { background-position: calc(-1 * var(--segment-width)) 0; }
+    from { background-position: calc(-1 * var(--segment-width)) 0; }
+    to   { background-position: 0 0; }
   }
 </style>
 
