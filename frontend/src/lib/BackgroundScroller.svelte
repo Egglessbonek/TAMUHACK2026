@@ -106,6 +106,66 @@
     0%, 49.999% { opacity: 0; }
     50%, 100%   { opacity: 1; }
   }
+
+  @media (hover: none) and (pointer: coarse) {
+    :global(.scroll-track) {
+      animation: none;
+      transform: none;
+      width: 100%;
+    }
+
+    :global(.scroll-segment) {
+      flex: 1 1 auto;
+      width: 100%;
+    }
+
+    :global(.scroll-track) .scroll-segment + .scroll-segment {
+      display: none;
+    }
+
+    :global(.scroll-sky) {
+      animation: fallbackSky calc((var(--segment-width) / var(--sky-scroll-speed)) * 1s) linear infinite;
+    }
+
+    :global(.scroll-grass) {
+      animation: fallbackGrass calc((var(--segment-width) / var(--grass-scroll-speed)) * 1s) linear infinite;
+    }
+  }
+
+  @supports (-moz-appearance: none) {
+    :global(.scroll-track) {
+      animation: none;
+      transform: none;
+      width: 100%;
+    }
+
+    :global(.scroll-segment) {
+      flex: 1 1 auto;
+      width: 100%;
+    }
+
+    :global(.scroll-track) .scroll-segment + .scroll-segment {
+      display: none;
+    }
+
+    :global(.scroll-sky) {
+      animation: fallbackSky calc((var(--segment-width) / var(--sky-scroll-speed)) * 1s) linear infinite;
+    }
+
+    :global(.scroll-grass) {
+      animation: fallbackGrass calc((var(--segment-width) / var(--grass-scroll-speed)) * 1s) linear infinite;
+    }
+  }
+
+  @keyframes fallbackSky {
+    from { background-position: 0 0; }
+    to   { background-position: calc(-1 * var(--segment-width)) 0; }
+  }
+
+  @keyframes fallbackGrass {
+    from { background-position: 0 0; }
+    to   { background-position: calc(-1 * var(--segment-width)) 0; }
+  }
 </style>
 
 

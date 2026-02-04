@@ -69,8 +69,12 @@
       if (!Number.isNaN(next)) totalMoos = next;
     });
 
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (event: CloseEvent) => {
       wsStatus = 'offline';
+      if (event.code === 1008) {
+        try { sessionStorage.removeItem(TURNSTILE_VALIDATED_KEY); } catch {}
+        window.location.reload();
+      }
     });
 
     ws.addEventListener('error', () => {
@@ -214,13 +218,36 @@
     }
   }
 
-  onMount(() => {
-    connect();
+  const TURNSTILE_VALIDATED_KEY = 'turnstile_validated';
 
-    // Prefetch and keep a rolling queue of upcoming sounds.
-    topUpPrefetchQueue();
+  function waitForTurnstileValidation(): Promise<void> {
+    if (sessionStorage.getItem(TURNSTILE_VALIDATED_KEY) === '1') return Promise.resolve();
+
+    return new Promise((resolve) => {
+      const handler = () => {
+        window.removeEventListener('turnstile-validated', handler);
+        resolve();
+      };
+      window.addEventListener('turnstile-validated', handler, { once: true });
+    });
+  }
+
+  onMount(() => {
+    let cancelled = false;
+
+    const start = async () => {
+      await waitForTurnstileValidation();
+      if (cancelled) return;
+      connect();
+
+      // Prefetch and keep a rolling queue of upcoming sounds.
+      topUpPrefetchQueue();
+    };
+
+    void start();
 
     return () => {
+      cancelled = true;
       try { ws?.close(); } catch {}
 
       if (flushTimer) {

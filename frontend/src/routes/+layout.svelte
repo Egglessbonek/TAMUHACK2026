@@ -4,6 +4,8 @@
   
   let { children } = $props(); // Svelte 5 syntax for children/slots
 
+  const TURNSTILE_VALIDATED_KEY = 'turnstile_validated';
+
   // Expose the callback globally so Turnstile can find it
   onMount(() => {
     window.onTurnstileSuccess = async (token) => {
@@ -15,14 +17,17 @@
           body: formData
         });
         if (res.ok) {
-           // Reload to pick up the cookie and start the app fresh (or signal the page)
-           // For simplicity in this architecture, reloading ensures +page.svelte mounts with the cookie present.
-           window.location.reload(); 
+           try { sessionStorage.setItem(TURNSTILE_VALIDATED_KEY, '1'); } catch {}
+           window.dispatchEvent(new CustomEvent('turnstile-validated'));
         }
       } catch (e) {
         console.error("Verification failed", e);
       }
     };
+
+    if (sessionStorage.getItem(TURNSTILE_VALIDATED_KEY) === '1') {
+      window.dispatchEvent(new CustomEvent('turnstile-validated'));
+    }
   });
 </script>
 
