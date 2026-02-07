@@ -312,6 +312,11 @@
   <button class="mode-toggle" on:click={toggleNightMode} aria-label="Toggle Night Mode">
     {isNightMode ? '☀️ Day' : '🌙 Night'}
   </button>
+  <div class="attribution">
+    <a href="https://www.vecteezy.com/free-vector/icons" target="_blank" rel="noreferrer">
+      Icons Vectors by Vecteezy
+    </a>
+  </div>
 </div>
 
 <style>
@@ -396,5 +401,30 @@
     font-variant-numeric: tabular-nums;
     min-width: 2ch;
     text-align: right;
+  }
+
+  .attribution {
+    position: absolute;
+    bottom: 1rem;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    z-index: 20; /* Same level as toggle to sit above tint */
+    font-family: 'Press Start 2P', cursive, sans-serif;
+    font-size: 0.5rem; /* Small and subtle */
+    pointer-events: none; /* Allows clicking through the empty space around the text */
+  }
+
+  .attribution a {
+    color: rgba(255, 255, 255, 0.6); /* Slightly transparent white */
+    text-decoration: none;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.8);
+    pointer-events: auto; /* Re-enable clicking for the link itself */
+    transition: color 0.2s;
+  }
+
+  .attribution a:hover {
+    color: white;
+    text-decoration: underline;
   }
 </style>
